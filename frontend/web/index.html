@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Citizen Scheme &amp; Support Navigator</title>
+<script src="/static/vendor/tailwind.js"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    fontFamily: { sans: ['Segoe UI','system-ui','-apple-system','sans-serif'] },
+    colors: { brand: {50:'#f0fdfa',100:'#ccfbf1',200:'#99f6e4',500:'#14b8a6',600:'#0d9488',700:'#0f766e',900:'#134e4a'} },
+    animation: { 'fade-up': 'fadeUp .4s ease both' },
+    keyframes: { fadeUp: { from: {opacity:0, transform:'translateY(8px)'}, to: {opacity:1, transform:'none'} } }
+  }}
+};
+</script>
+<style>
+  .scrollbar-thin::-webkit-scrollbar{width:6px;height:6px}
+  .scrollbar-thin::-webkit-scrollbar-thumb{background:#99f6e4;border-radius:3px}
+  details summary::-webkit-details-marker{display:none}
+  details[open] .chev{transform:rotate(180deg)}
+  .typing i{width:6px;height:6px;border-radius:50%;background:#2dd4bf;display:inline-block;animation:blink 1.2s infinite}
+  .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+</style>
+</head>
+<body class="bg-stone-50 text-slate-800 font-sans antialiased">
+
+<!-- ===== Top bar ===== -->
+<header class="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-4 h-16 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-brand-600 grid place-items-center text-white text-lg">🧭</div>
+    <div>
+      <h1 class="font-bold leading-tight">Citizen Scheme Navigator</h1>
+      <p class="text-xs text-slate-500 -mt-0.5">Find the government schemes you're entitled to — with sources</p>
+    </div>
+    <div id="health" class="ml-auto hidden sm:flex items-center gap-2 text-xs text-slate-500">
+      <span class="w-2 h-2 rounded-full bg-slate-300" id="health-dot"></span><span id="health-txt">checking…</span>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-7xl mx-auto px-4 py-6 grid lg:grid-cols-[360px_1fr] gap-6 items-start">
+
+  <!-- ===== Profile panel ===== -->
+  <aside class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 lg:sticky lg:top-20">
+    <h2 class="font-semibold text-slate-900 flex items-center gap-2">👪 Your household profile</h2>
+    <p class="text-xs text-slate-500 mt-1 mb-4">Nothing is stored — used only to match schemes.</p>
+
+    <!-- voice -->
+    <div class="mb-4 p-3 rounded-xl bg-brand-50 border border-brand-100">
+      <div class="flex items-center justify-between">
+        <p class="text-sm font-medium text-brand-900">🎙️ Speak your situation</p>
+        <button id="rec-btn" onclick="toggleRecord()" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-brand-200 text-brand-700 hover:bg-brand-100 transition">● Record</button>
+      </div>
+      <p id="rec-status" class="text-xs text-slate-500 mt-1">English, Hindi or Telugu — we'll fill the form for you.</p>
+    </div>
+
+    <form id="profile-form" class="space-y-3" onsubmit="findSchemes(event)">
+      <div class="grid grid-cols-2 gap-3">
+        <label class="block"><span class="text-xs font-medium text-slate-600">Age</span>
+          <input id="f-age" type="number" min="0" max="120" value="35" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"></label>
+        <label class="block"><span class="text-xs font-medium text-slate-600">Gender</span>
+          <select id="f-gender" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2 text-sm bg-white">
+            <option value="female">Female</option><option value="male">Male</option><option value="other">Other</option>
+          </select></label>
+      </div>
+      <label class="block"><span class="text-xs font-medium text-slate-600">Household annual income (₹)</span>
+        <input id="f-income" type="number" min="0" step="5000" value="100000" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none"></label>
+      <div class="grid grid-cols-2 gap-3">
+        <label class="block"><span class="text-xs font-medium text-slate-600">Family size</span>
+          <input id="f-family" type="number" min="1" value="4" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2 text-sm"></label>
+        <label class="block"><span class="text-xs font-medium text-slate-600">Category</span>
+          <select id="f-category" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2 text-sm bg-white"></select></label>
+      </div>
+      <label class="block"><span class="text-xs font-medium text-slate-600">Occupation</span>
+        <select id="f-occupation" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2 text-sm bg-white"></select></label>
+      <label class="block"><span class="text-xs font-medium text-slate-600">State / UT</span>
+        <select id="f-state" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2 text-sm bg-white"></select></label>
+
+      <fieldset class="pt-1">
+        <span class="text-xs font-medium text-slate-600">Situations that apply</span>
+        <div class="mt-2 grid grid-cols-2 gap-2 text-sm" id="flags">
+          <label class="flex items-center gap-2"><input type="checkbox" id="f-student" class="rounded text-brand-600 focus:ring-brand-500">Student</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="f-disabled" class="rounded text-brand-600">Disability</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="f-farmer" class="rounded text-brand-600">Owns farmland</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="f-bpl" class="rounded text-brand-600">BPL card</label>
+        </div>
+      </fieldset>
+
+      <label class="block"><span class="text-xs font-medium text-slate-600">Anything else, in your own words</span>
+        <textarea id="f-freetext" rows="2" placeholder="e.g. I recently lost my job, I am a widow raising two children…" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none"></textarea></label>
+
+      <button id="submit-btn" type="submit" class="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-[.99] text-white font-semibold shadow-sm transition">
+        Find my schemes
+      </button>
+    </form>
+  </aside>
+
+  <!-- ===== Main column ===== -->
+  <main class="space-y-6 min-w-0">
+
+    <!-- empty / loading / results -->
+    <section id="results-area">
+      <div id="empty-state" class="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center">
+        <div class="text-5xl mb-3">🏛️</div>
+        <h2 class="text-lg font-semibold text-slate-900">Which schemes are you entitled to?</h2>
+        <p class="text-sm text-slate-500 mt-1 max-w-md mx-auto">Fill in your household profile (or just speak it) and our AI agents will check <b>21 real government schemes</b>, explain each verdict, and link every claim to its official source.</p>
+        <div class="mt-4 flex flex-wrap justify-center gap-2 text-xs">
+          <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">🟢 Likely eligible</span>
+          <span class="px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">🟡 Possibly eligible</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-300">⚪ Needs more info</span>
+          <span class="px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">🔴 Not eligible</span>
+        </div>
+      </div>
+
+      <div id="loading-state" class="hidden bg-white rounded-2xl border border-slate-200 p-10 text-center">
+        <div class="w-12 h-12 mx-auto rounded-full border-4 border-brand-100 border-t-brand-600 animate-spin"></div>
+        <p id="loading-msg" class="mt-4 font-medium text-slate-700">Reading your profile…</p>
+        <p class="text-xs text-slate-400 mt-1">Six AI agents are working — this takes about a minute.</p>
+        <div class="mt-4 h-1.5 bg-slate-100 rounded-full overflow-hidden max-w-sm mx-auto"><div id="loading-bar" class="h-full bg-brand-500 rounded-full transition-all duration-1000" style="width:5%"></div></div>
+      </div>
+
+      <div id="results" class="hidden space-y-4"></div>
+    </section>
+
+    <!-- chat -->
+    <section id="chat-section" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-up">
+      <div class="px-5 py-4 border-b border-slate-100 bg-brand-50">
+        <h2 class="font-semibold text-slate-900">💬 Questions? Ask about your results</h2>
+        <div class="mt-2 flex flex-wrap gap-2" id="chat-suggestions"></div>
+      </div>
+      <div id="chat-log" class="max-h-96 overflow-y-auto scrollbar-thin px-5 py-4 space-y-3"></div>
+      <form onsubmit="sendChat(event)" class="flex gap-2 p-4 border-t border-slate-100">
+        <input id="chat-input" autocomplete="off" placeholder="e.g. Which scheme should I apply for first?" class="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+        <button class="px-5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm transition">Send</button>
+      </form>
+    </section>
+
+    <!-- browse KB -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+      <details>
+        <summary class="cursor-pointer select-none px-5 py-4 flex items-center justify-between font-semibold text-slate-900">
+          📚 Browse all schemes in the knowledge base
+          <svg class="chev w-4 h-4 text-slate-400 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+        </summary>
+        <div id="kb-list" class="px-5 pb-5 grid sm:grid-cols-2 gap-3"></div>
+      </details>
+    </section>
+
+    <p class="text-center text-xs text-slate-400 pb-4">Guidance only — always confirm on the official portal linked with each scheme. · <a class="underline hover:text-brand-600" href="/docs">API docs</a></p>
+  </main>
+</div>
+
+<div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm shadow-xl"></div>
+
+<script>
+const API = "";  // same origin
+const $ = id => document.getElementById(id);
+let lastResponse = null, chatHistory = [], mediaRecorder = null, chunks = [];
+
+const OCCUPATIONS = ["Farmer / Agricultural worker","Daily wage / Unorganized sector worker","Self-employed / Small business owner","Salaried employee","Homemaker","Student","Unemployed","Retired","Other"];
+const STATES = ["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal","Delhi (NCT)","Jammu and Kashmir","Ladakh"];
+const CATEGORIES = ["General","SC","ST","OBC","Minority"];
+const VERDICT_STYLE = {
+  "Likely Eligible":  {dot:"🟢", badge:"bg-emerald-50 text-emerald-700 border-emerald-200", bar:"bg-emerald-500"},
+  "Possibly Eligible":{dot:"🟡", badge:"bg-amber-50 text-amber-700 border-amber-200", bar:"bg-amber-500"},
+  "Needs More Info":  {dot:"⚪", badge:"bg-slate-100 text-slate-600 border-slate-300", bar:"bg-slate-400"},
+  "Not Eligible":     {dot:"🔴", badge:"bg-rose-50 text-rose-700 border-rose-200", bar:"bg-rose-400"},
+};
+const LOADING_STEPS = ["Reading your profile…","Searching 21 schemes + the web…","Reasoning about your eligibility…","Listing documents you'll need…","Rewriting everything in plain language…","Attaching official sources…"];
+
+function esc(s){ const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML; }
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 4000); }
+function fillSelect(id, opts){ $(id).innerHTML = opts.map(o=>`<option>${o}</option>`).join(''); }
+
+// ---------- init ----------
+fillSelect('f-occupation', OCCUPATIONS); fillSelect('f-state', STATES); fillSelect('f-category', CATEGORIES);
+
+fetch(API+"/api/v1/health").then(r=>r.json()).then(h=>{
+  $('health-dot').className = "w-2 h-2 rounded-full " + (h.status==="ok" ? "bg-emerald-500" : "bg-rose-500");
+  $('health-txt').textContent = h.status==="ok" ? `online · ${h.schemes_indexed} schemes` : "backend issue";
+}).catch(()=>{ $('health-dot').className="w-2 h-2 rounded-full bg-rose-500"; $('health-txt').textContent="backend offline"; });
+
+fetch(API+"/api/v1/schemes").then(r=>r.json()).then(list=>{
+  $('kb-list').innerHTML = list.map(s=>`
+    <div class="p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:shadow-sm transition">
+      <p class="text-sm font-semibold text-slate-800">${esc(s.name)}</p>
+      <p class="text-xs text-brand-600 font-medium">${esc(s.category)}</p>
+      <p class="text-xs text-slate-500 mt-1 line-clamp-2">${esc(s.description)}</p>
+      <a href="${esc(s.source.url)}" target="_blank" rel="noopener" class="text-xs text-brand-600 underline">${esc(s.source.name)} ↗</a>
+    </div>`).join('');
+}).catch(()=>{ $('kb-list').innerHTML = '<p class="text-sm text-slate-400">Could not load scheme list.</p>'; });
+
+// ---------- find schemes ----------
+async function findSchemes(e){
+  e.preventDefault();
+  const profile = {
+    age:+$('f-age').value, gender:$('f-gender').value, annual_income:+$('f-income').value,
+    family_size:+$('f-family').value, occupation:$('f-occupation').value, state:$('f-state').value,
+    category:$('f-category').value, is_student:$('f-student').checked, is_disabled:$('f-disabled').checked,
+    is_farmer:$('f-farmer').checked, is_bpl:$('f-bpl').checked,
+  };
+  const free_text_context = $('f-freetext').value.trim() || null;
+
+  $('empty-state').classList.add('hidden'); $('results').classList.add('hidden');
+  $('chat-section').classList.add('hidden'); $('loading-state').classList.remove('hidden');
+  $('submit-btn').disabled = true; $('submit-btn').classList.add('opacity-60');
+
+  let step = 0;
+  const stepTimer = setInterval(()=>{
+    step = Math.min(step+1, LOADING_STEPS.length-1);
+    $('loading-msg').textContent = LOADING_STEPS[step];
+    $('loading-bar').style.width = (8 + step*15) + "%";
+  }, 9000);
+  $('loading-msg').textContent = LOADING_STEPS[0]; $('loading-bar').style.width = "8%";
+
+  try{
+    const r = await fetch(API+"/api/v1/navigate", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({profile, language:"en", free_text_context})
+    });
+    if(!r.ok){ const b = await r.json().catch(()=>({})); throw new Error(b.detail || `Request failed (${r.status})`); }
+    lastResponse = await r.json();
+    chatHistory = [];
+    renderResults(lastResponse);
+  }catch(err){
+    toast("⚠️ " + err.message);
+    $('empty-state').classList.remove('hidden');
+  }finally{
+    clearInterval(stepTimer);
+    $('loading-state').classList.add('hidden');
+    $('submit-btn').disabled = false; $('submit-btn').classList.remove('opacity-60');
+  }
+}
+
+function renderResults(resp){
+  const recs = resp.recommendations || [];
+  const container = $('results');
+  const warnings = (resp.warnings||[]).map(w=>`<div class="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">⚠️ ${esc(w)}</div>`).join('');
+  const summary = resp.profile_summary ? `
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 text-sm text-slate-600 animate-fade-up">
+      <span class="text-xs font-semibold uppercase tracking-wide text-brand-600">How the AI understood you</span>
+      <p class="mt-1">${esc(resp.profile_summary)}</p>
+    </div>` : '';
+
+  container.innerHTML = warnings + summary + `<h2 class="text-lg font-bold text-slate-900 pt-1">Your recommendations <span class="text-sm font-normal text-slate-400">(${recs.length} schemes checked, best first)</span></h2>` +
+    (recs.length ? recs.map(cardHTML).join('') : '<div class="bg-white rounded-2xl border p-8 text-center text-slate-500">No matching schemes found for this profile.</div>');
+  container.classList.remove('hidden');
+
+  // chat
+  $('chat-section').classList.remove('hidden');
+  $('chat-log').innerHTML = `<div class="text-sm text-slate-500 bg-slate-50 rounded-xl p-3">Hi! I've read all ${recs.length} results above. Ask me anything about them — why a verdict came out that way, what to apply for first, or where to get a document.</div>`;
+  const sugg = ["Which scheme should I apply for first?","What documents do I need?","Why am I not eligible for some schemes?"];
+  $('chat-suggestions').innerHTML = sugg.map(s=>`<button onclick="askSuggestion(this)" class="text-xs px-3 py-1.5 rounded-full bg-white border border-brand-200 text-brand-700 hover:bg-brand-100 transition">${s}</button>`).join('');
+  container.scrollIntoView({behavior:"smooth"});
+}
+
+function cardHTML(rec, i){
+  const st = VERDICT_STYLE[rec.verdict] || VERDICT_STYLE["Needs More Info"];
+  const conf = Math.round((rec.confidence||0)*100);
+  const docs = (rec.required_documents||[]).map(d=>`<li>${esc(d)}</li>`).join('');
+  const steps = (rec.application_steps||[]).map(s=>`<li>${esc(s)}</li>`).join('');
+  const blockers = (rec.common_blockers||[]).map(b=>`<li>${esc(b)}</li>`).join('');
+  const origin = rec.source?.origin==="knowledge_base" ? "Official knowledge base" : "Live web search";
+  return `
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-up" style="animation-delay:${i*60}ms">
+    <details ${i===0?'open':''}>
+      <summary class="cursor-pointer select-none p-5 flex items-start gap-4">
+        <span class="text-2xl leading-none mt-0.5">${st.dot}</span>
+        <span class="flex-1 min-w-0">
+          <span class="flex flex-wrap items-center gap-2">
+            <span class="font-semibold text-slate-900">${esc(rec.scheme_name)}</span>
+            <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full border ${st.badge}">${esc(rec.verdict)}</span>
+            <span class="text-[11px] text-slate-400">${esc(rec.category)}</span>
+          </span>
+          <span class="block text-sm text-slate-500 mt-1">${esc(rec.reason)}</span>
+          <span class="mt-2 flex items-center gap-2">
+            <span class="h-1.5 w-28 bg-slate-100 rounded-full overflow-hidden"><span class="block h-full ${st.bar}" style="width:${conf}%"></span></span>
+            <span class="text-[11px] text-slate-400">${conf}% confidence</span>
+          </span>
+        </span>
+        <svg class="chev w-4 h-4 text-slate-400 transition-transform shrink-0 mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+      </summary>
+      <div class="px-5 pb-5 pt-1 space-y-4 border-t border-slate-100 text-sm">
+        ${rec.simplified_explanation ? `
+        <div class="p-4 rounded-xl bg-brand-50/60 border border-brand-100">
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">In plain language</p>
+            <button onclick="listen(this,'${rec.scheme_id}')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-brand-200 text-brand-700 hover:bg-brand-100 transition shrink-0">🔊 Listen</button>
+          </div>
+          <p class="mt-1.5 text-slate-700">${esc(rec.simplified_explanation)}</p>
+        </div>`:''}
+        ${rec.benefits ? `<p><b>💰 Benefits:</b> ${esc(rec.benefits)}</p>`:''}
+        <div class="grid md:grid-cols-2 gap-4">
+          ${docs ? `<div><p class="font-semibold mb-1">📄 Documents needed</p><ul class="list-disc ml-5 space-y-0.5 text-slate-600">${docs}</ul></div>`:''}
+          ${steps ? `<div><p class="font-semibold mb-1">📝 How to apply</p><ol class="list-decimal ml-5 space-y-0.5 text-slate-600">${steps}</ol></div>`:''}
+        </div>
+        ${blockers ? `<div><p class="font-semibold mb-1">⏳ Common delays</p><ul class="list-disc ml-5 space-y-0.5 text-slate-600">${blockers}</ul></div>`:''}
+        <p class="text-xs text-slate-400 pt-1 border-t border-slate-100">Source (${origin}): <a class="text-brand-600 underline" target="_blank" rel="noopener" href="${esc(rec.source?.url||'#')}">${esc(rec.source?.name||'link')} ↗</a></p>
+      </div>
+    </details>
+  </div>`;
+}
+
+// ---------- listen (TTS) ----------
+async function listen(btn, schemeId){
+  const rec = (lastResponse?.recommendations||[]).find(r=>r.scheme_id===schemeId);
+  if(!rec) return;
+  const orig = btn.textContent; btn.textContent = "⏳…"; btn.disabled = true;
+  try{
+    const r = await fetch(API+"/api/v1/voice/speak", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({text: rec.simplified_explanation, language:"en"})});
+    if(!r.ok) throw new Error("audio unavailable");
+    new Audio(URL.createObjectURL(await r.blob())).play();
+  }catch(e){ toast("⚠️ Could not generate audio."); }
+  btn.textContent = orig; btn.disabled = false;
+}
+
+// ---------- voice input ----------
+async function toggleRecord(){
+  const btn = $('rec-btn'), status = $('rec-status');
+  if(mediaRecorder && mediaRecorder.state === "recording"){ mediaRecorder.stop(); return; }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    chunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t=>t.stop());
+      btn.textContent = "● Record"; btn.classList.remove('bg-rose-600','text-white','border-rose-600');
+      status.textContent = "Transcribing…";
+      const blob = new Blob(chunks, {type: mediaRecorder.mimeType || "audio/webm"});
+      const fd = new FormData(); fd.append("file", blob, "recording.webm");
+      try{
+        const r = await fetch(API+"/api/v1/voice/transcribe", {method:"POST", body: fd});
+        const b = await r.json();
+        if(!r.ok) throw new Error(b.detail || "transcription failed");
+        applyVoiceResult(b);
+        status.textContent = "Heard: “" + (b.transcript||"") + "”";
+      }catch(err){ status.textContent = "⚠️ " + err.message; }
+    };
+    mediaRecorder.start();
+    btn.textContent = "■ Stop"; btn.classList.add('bg-rose-600','text-white','border-rose-600');
+    status.textContent = "Recording… tap Stop when done.";
+  }catch(e){ status.textContent = "⚠️ Microphone not available in this browser."; }
+}
+
+function applyVoiceResult(b){
+  const p = b.suggested_profile || {};
+  if(Number.isInteger(p.age)) $('f-age').value = Math.max(0, Math.min(120, p.age));
+  if(["male","female","other"].includes(p.gender)) $('f-gender').value = p.gender;
+  if(typeof p.annual_income === "number" && p.annual_income>=0) $('f-income').value = Math.round(p.annual_income);
+  if(Number.isInteger(p.family_size) && p.family_size>=1) $('f-family').value = p.family_size;
+  if(STATES.includes(p.state)) $('f-state').value = p.state;
+  if(CATEGORIES.includes(p.category)) $('f-category').value = p.category;
+  [["is_student","f-student"],["is_disabled","f-disabled"],["is_farmer","f-farmer"],["is_bpl","f-bpl"]].forEach(([k,id])=>{
+    if(typeof p[k] === "boolean") $(id).checked = p[k];
+  });
+  if(b.transcript) $('f-freetext').value = b.transcript;
+}
+
+// ---------- chat ----------
+function askSuggestion(btn){ $('chat-input').value = btn.textContent; sendChat(new Event('submit')); }
+
+function bubble(role, html){
+  const wrap = document.createElement('div');
+  wrap.className = role==="user" ? "flex justify-end" : "flex justify-start";
+  wrap.innerHTML = `<div class="max-w-[85%] px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap ${role==="user" ? "bg-brand-600 text-white rounded-br-md" : "bg-slate-100 text-slate-800 rounded-bl-md"}">${html}</div>`;
+  $('chat-log').appendChild(wrap);
+  $('chat-log').scrollTop = $('chat-log').scrollHeight;
+  return wrap;
+}
+
+async function sendChat(e){
+  e.preventDefault();
+  const input = $('chat-input');
+  const msg = input.value.trim();
+  if(!msg || !lastResponse) return;
+  input.value = "";
+  bubble("user", esc(msg));
+  const thinking = bubble("assistant", '<span class="typing"><i></i> <i></i> <i></i></span>');
+  try{
+    const r = await fetch(API+"/api/v1/chat", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({message: msg, history: chatHistory, profile_summary: lastResponse.profile_summary||"", recommendations: lastResponse.recommendations||[]})
+    });
+    const b = await r.json();
+    if(!r.ok) throw new Error(b.detail || "chat failed");
+    thinking.querySelector('div').innerHTML = esc(b.reply).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/^- (.+)$/gm,'• $1');
+    chatHistory.push({role:"user", content: msg}, {role:"assistant", content: b.reply});
+    if(chatHistory.length > 24) chatHistory = chatHistory.slice(-24);
+  }catch(err){
+    thinking.querySelector('div').innerHTML = "⚠️ " + esc(err.message);
+  }
+  $('chat-log').scrollTop = $('chat-log').scrollHeight;
+}
+</script>
+</body>
+</html>

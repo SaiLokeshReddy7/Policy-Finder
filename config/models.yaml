@@ -1,0 +1,69 @@
+# Model + provider configuration for the Citizen Scheme & Support Navigator.
+#
+# Every "api_key" field accepts either:
+#   - a literal string you paste in directly, e.g. api_key: "sk-ant-..."
+#   - an ${ENV_VAR} placeholder resolved from the environment / .env file (recommended,
+#     so real secrets never get committed to source control)
+#
+# After editing, no code changes are required — backend/core/config.py reloads this
+# file at process start.
+
+llm_providers:
+  anthropic:
+    api_key: "${ANTHROPIC_API_KEY}"
+    base_url: "https://api.anthropic.com"
+    max_retries: 3
+    timeout_seconds: 60
+    models:
+      # Fast/cheap model used to normalize the raw profile form into structured data
+      intake: "claude-haiku-4-5-20251001"
+      # Core reasoning model used to score scheme eligibility against a profile
+      eligibility_reasoning: "claude-sonnet-5"
+      # Generates the required-documents checklist and application guidance
+      document_guidance: "claude-sonnet-5"
+      # Used to simplify/localize text ONLY if the Hugging Face model below is unavailable
+      simplification_fallback: "claude-haiku-4-5-20251001"
+      # Follow-up Q&A chat grounded in the recommendations the user just received
+      chat: "claude-sonnet-5"
+
+  huggingface:
+    api_key: "${HF_API_TOKEN}"
+    # Base URL for HF's Inference Providers router (replaces the retired classic
+    # api-inference.huggingface.co). Chat/instruct models are called at
+    # {inference_api_url}/v1/chat/completions (OpenAI-compatible, provider
+    # auto-selected); pipeline-style tasks like ASR are called at
+    # {inference_api_url}/hf-inference/models/{model}.
+    inference_api_url: "https://router.huggingface.co"
+    max_retries: 3
+    timeout_seconds: 60
+    models:
+      # Open-source instruction-tuned model used by the Language Simplification agent.
+      # Served via a third-party Inference Provider (e.g. together, featherless-ai) behind
+      # the router -- whether a given account can reach it for free depends on HF's small
+      # monthly Inference Providers credit. Falls back to Claude automatically either way.
+      simplification: "Qwen/Qwen2.5-7B-Instruct"
+      # Local, no-API-key embedding model (downloaded once via sentence-transformers)
+      # used to build/query the scheme knowledge-base vector index
+      embeddings: "sentence-transformers/all-MiniLM-L6-v2"
+      # Open-source multilingual speech-to-text model (handles en/hi/te), served free by
+      # HF's own "hf-inference" provider -- confirmed live as of this build.
+      speech_to_text: "openai/whisper-large-v3-turbo"
+      # Note: there is no text_to_speech entry here. No HF Inference Provider currently
+      # serves an open Hindi/Telugu-capable TTS model (verified while building this
+      # feature -- see ARCHITECTURE.md §6), so text_to_speech_tool.py uses gTTS instead.
+
+search:
+  # duckduckgo requires no API key at all. Switch to tavily/serpapi for higher quality
+  # results once you have a free-tier key for one of those providers.
+  provider: "duckduckgo"        # duckduckgo | tavily | serpapi
+  max_results: 5
+  tavily_api_key: "${TAVILY_API_KEY}"
+  serpapi_api_key: "${SERPAPI_API_KEY}"
+
+app:
+  default_language: "en"
+  supported_languages: ["en", "hi", "te"]
+  vector_store_path: "./data/vectorstore"
+  seed_data_path: "./data/schemes/seed_schemes.json"
+  request_timeout_seconds: 30
+  max_schemes_returned: 8
