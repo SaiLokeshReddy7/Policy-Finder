@@ -1,4 +1,4 @@
-# AI Citizen Scheme & Support Navigator
+# AI People Schemes & Support Navigator
 
 A multi-agent public-service navigator that turns fragmented Indian government
 welfare-scheme information into traceable, personalized, and easy-to-act-on
